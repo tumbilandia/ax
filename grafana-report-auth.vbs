@@ -1,33 +1,39 @@
 ' =============================================================
-' Script Name  : grafana_to_ppt.vbs
-' Description  : Downloads an image from Grafana using an API Key and inserts it into a PowerPoint slide.
+' Script Name  : grafana_multi_ppt.vbs
+' Description  : Downloads multiple images from Grafana and inserts them into a PowerPoint presentation.
+' Author      : Pedro's Assistant
 ' =============================================================
 
-' Set output file paths
-Dim scriptPath, imagePath, pptPath
+Dim scriptPath, pptPath, apiKey
 scriptPath = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
-imagePath = scriptPath & "\grafana_panel.png"
-pptPath = scriptPath & "\grafana_presentation.pptx"
+pptPath = scriptPath & "\grafana_dashboard.pptx"
 
-' Grafana API Key (replace with your actual key)
-Dim apiKey
-apiKey = "eyJrIjoiABC123..."  ' ⚠️ Replace this with your actual API Key
+' Grafana API Key (Replace with your key)
+apiKey = "eyJrIjoiABC123..." ' ⚠️ Replace with your actual API Key
 
-' Image URL
-Dim imageUrl
-imageUrl = "http://localhost:3000/render/d/Kdh0OoSGz2/windows-exporter-dashboard-2024-v2?orgId=1&format=png"
+' Define Grafana image URLs (Modify as needed)
+Dim imageUrls, imagePaths
+imageUrls = Array( _
+    "http://localhost:3000/render/d/Kdh0OoSGz2/panel1?orgId=1&format=png", _
+    "http://localhost:3000/render/d/Kdh0OoSGz2/panel2?orgId=1&format=png", _
+    "http://localhost:3000/render/d/Kdh0OoSGz2/panel3?orgId=1&format=png" _
+)
 
-' Download the image
-If DownloadImage(imageUrl, imagePath, apiKey) Then
-    WScript.Echo "✅ Image downloaded successfully: " & imagePath
-    ' Insert into PowerPoint
-    If InsertImageIntoPPT(imagePath, pptPath) Then
-        WScript.Echo "✅ PowerPoint created successfully: " & pptPath
-    Else
-        WScript.Echo "❌ Failed to create PowerPoint."
+' Download images and store file paths
+ReDim imagePaths(UBound(imageUrls))
+Dim i
+For i = 0 To UBound(imageUrls)
+    imagePaths(i) = scriptPath & "\grafana_" & (i+1) & ".png"
+    If Not DownloadImage(imageUrls(i), imagePaths(i), apiKey) Then
+        WScript.Echo "❌ Failed to download: " & imageUrls(i)
     End If
+Next
+
+' Insert images into PowerPoint
+If InsertImagesIntoPPT(imagePaths, pptPath) Then
+    WScript.Echo "✅ PowerPoint created successfully: " & pptPath
 Else
-    WScript.Echo "❌ Failed to download image."
+    WScript.Echo "❌ Failed to create PowerPoint."
 End If
 
 ' =============================================================
@@ -36,29 +42,22 @@ End If
 ' =============================================================
 Function DownloadImage(url, filePath, apiKey)
     Dim objHTTP, objStream
-    DownloadImage = False ' Default to failure
+    DownloadImage = False
 
-    ' Create HTTP request
     Set objHTTP = CreateObject("MSXML2.XMLHTTP.6.0")
     objHTTP.Open "GET", url, False
     objHTTP.setRequestHeader "Authorization", "Bearer " & apiKey
     objHTTP.Send
 
-    ' Check if request was successful
     If objHTTP.Status = 200 Then
         Set objStream = CreateObject("ADODB.Stream")
         objStream.Type = 1 ' Binary mode
         objStream.Open
         objStream.Write objHTTP.responseBody
-
-        ' Ensure the file is an image
         If objStream.Size > 0 Then
             objStream.SaveToFile filePath, 2 ' Overwrite if exists
             DownloadImage = True
-        Else
-            WScript.Echo "❌ Image file is empty. Check authentication or URL."
         End If
-
         objStream.Close
         Set objStream = Nothing
     Else
@@ -69,12 +68,12 @@ Function DownloadImage(url, filePath, apiKey)
 End Function
 
 ' =============================================================
-' Function: InsertImageIntoPPT
-' Purpose : Creates a PowerPoint file and inserts the downloaded image.
+' Function: InsertImagesIntoPPT
+' Purpose : Creates a PowerPoint file and inserts multiple images in a grid.
 ' =============================================================
-Function InsertImageIntoPPT(imagePath, pptPath)
+Function InsertImagesIntoPPT(imagePaths, pptPath)
     Dim pptApp, pptPres, pptSlide
-    InsertImageIntoPPT = False ' Default to failure
+    InsertImagesIntoPPT = False
 
     ' Create PowerPoint Application
     On Error Resume Next
@@ -85,30 +84,41 @@ Function InsertImageIntoPPT(imagePath, pptPath)
     End If
     On Error GoTo 0
 
-    pptApp.Visible = True ' Show PowerPoint
-
-    ' Create a new presentation
+    pptApp.Visible = True
     Set pptPres = pptApp.Presentations.Add
-    Set pptSlide = pptPres.Slides.Add(1, 1) ' 1 = ppLayoutTitle
+    Set pptSlide = pptPres.Slides.Add(1, 1) ' ppLayoutTitle
 
-    ' Insert image
-    On Error Resume Next
-    pptSlide.Shapes.AddPicture imagePath, False, True, 100, 100, 600, 400
-    If Err.Number <> 0 Then
-        WScript.Echo "❌ Failed to insert image into PowerPoint."
-        Exit Function
-    End If
-    On Error GoTo 0
+    ' Grid Layout: 2 columns per row
+    Dim imgWidth, imgHeight, startX, startY, colGap, rowGap
+    imgWidth = 400 : imgHeight = 300 ' Adjust size
+    startX = 50 : startY = 100
+    colGap = 20 : rowGap = 30
+
+    ' Insert images
+    Dim row, col, posX, posY
+    row = 0 : col = 0
+    For i = 0 To UBound(imagePaths)
+        posX = startX + (col * (imgWidth + colGap))
+        posY = startY + (row * (imgHeight + rowGap))
+
+        pptSlide.Shapes.AddPicture imagePaths(i), False, True, posX, posY, imgWidth, imgHeight
+
+        ' Update row/column positions
+        col = col + 1
+        If col > 1 Then ' 2 columns per row
+            col = 0
+            row = row + 1
+        End If
+    Next
 
     ' Save and close
     pptPres.SaveAs pptPath
     pptPres.Close
     pptApp.Quit
 
-    ' Cleanup
     Set pptSlide = Nothing
     Set pptPres = Nothing
     Set pptApp = Nothing
 
-    InsertImageIntoPPT = True
+    InsertImagesIntoPPT = True
 End Function
