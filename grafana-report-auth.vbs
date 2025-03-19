@@ -31,8 +31,8 @@ Function DownloadImage(url, filePath, user, pass)
 
     Set objHTTP = CreateObject("MSXML2.XMLHTTP.6.0")
 
-    ' Encode credentials in Base64 (to fix authentication issues)
-    base64Auth = "Basic " & Base64Encode(user & ":" & pass)
+    ' Encode credentials in Base64 using a correct method
+    base64Auth = "Basic " & EncodeBase64(user & ":" & pass)
 
     objHTTP.Open "GET", url, False
     objHTTP.setRequestHeader "Authorization", base64Auth
@@ -63,18 +63,28 @@ Function DownloadImage(url, filePath, user, pass)
 End Function
 
 ' =============================================================
-' Function: Base64Encode
-' Purpose : Encodes a string in Base64 for HTTP Basic Authentication.
+' Function: EncodeBase64
+' Purpose : Correctly encodes a string in Base64 for HTTP Basic Authentication.
 ' =============================================================
-Function Base64Encode(text)
-    Dim xml, node
-    Set xml = CreateObject("MSXML2.DOMDocument")
-    Set node = xml.createElement("b64")
-    node.DataType = "bin.base64"
-    node.Text = text
-    Base64Encode = node.Text
-    Set node = Nothing
-    Set xml = Nothing
+Function EncodeBase64(text)
+    Dim bytes, objXML, objNode
+    Set bytes = CreateObject("ADODB.Stream")
+    bytes.Type = 2 ' Text mode
+    bytes.Charset = "utf-8"
+    bytes.Open
+    bytes.WriteText text
+    bytes.Position = 0
+    bytes.Type = 1 ' Convert to binary
+
+    Set objXML = CreateObject("MSXML2.DOMDocument")
+    Set objNode = objXML.createElement("b64")
+    objNode.DataType = "bin.base64"
+    objNode.nodeTypedValue = bytes.Read
+    EncodeBase64 = Replace(objNode.Text, vbLf, "")
+
+    Set objNode = Nothing
+    Set objXML = Nothing
+    Set bytes = Nothing
 End Function
 
 ' =============================================================
@@ -110,5 +120,3 @@ Sub CreatePowerPoint(imagePath, outputPath)
 
     WScript.Echo "✅ PowerPoint created successfully: " & outputPath
 End Sub
-
-
