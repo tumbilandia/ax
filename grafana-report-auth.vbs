@@ -1,24 +1,23 @@
 ' =============================================================
 ' Script Name  : download_image.vbs
-' Description  : Downloads an image from Grafana and saves it locally.
+' Description  : Downloads an image from Grafana using an API Key.
 ' =============================================================
 
-' Set the output file path (same directory as the script)
+' Set output file path
 Dim scriptPath, imagePath
 scriptPath = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
 imagePath = scriptPath & "\grafana_panel.png"
 
-' Grafana credentials
-Dim username, password
-username = "admin"  ' Change this if needed
-password = "admin"
+' Grafana API Key (replace with your actual key)
+Dim apiKey
+apiKey = "eyJrIjoiABC123..."  ' ⚠️ Replace this with your API Key
 
 ' Image URL
 Dim imageUrl
-imageUrl = "http://localhost:3000/render/d/Kdh0OoSGz2/windows-exporter-dashboard-2024-v2?orgId=1"
+imageUrl = "http://localhost:3000/render/d/Kdh0OoSGz2/windows-exporter-dashboard-2024-v2?orgId=1&format=png"
 
 ' Download the image
-If DownloadImage(imageUrl, imagePath, username, password) Then
+If DownloadImage(imageUrl, imagePath, apiKey) Then
     WScript.Echo "✅ Image downloaded successfully: " & imagePath
 Else
     WScript.Echo "❌ Failed to download image."
@@ -26,23 +25,19 @@ End If
 
 ' =============================================================
 ' Function: DownloadImage
-' Purpose : Downloads an image from the specified URL with authentication.
+' Purpose : Downloads an image from Grafana using an API Key.
 ' =============================================================
-Function DownloadImage(url, filePath, user, pass)
-    Dim objHTTP, objStream, base64Auth
+Function DownloadImage(url, filePath, apiKey)
+    Dim objHTTP, objStream
     DownloadImage = False ' Default to failure
 
     ' Create HTTP request
     Set objHTTP = CreateObject("MSXML2.XMLHTTP.6.0")
-
-    ' Encode credentials in Base64
-    base64Auth = "Basic " & EncodeBase64(user & ":" & pass)
-
     objHTTP.Open "GET", url, False
-    objHTTP.setRequestHeader "Authorization", base64Auth
+    objHTTP.setRequestHeader "Authorization", "Bearer " & apiKey
     objHTTP.Send
 
-    ' Check if the request was successful
+    ' Check if request was successful
     If objHTTP.Status = 200 Then
         Set objStream = CreateObject("ADODB.Stream")
         objStream.Type = 1 ' Binary mode
@@ -51,8 +46,8 @@ Function DownloadImage(url, filePath, user, pass)
 
         ' Ensure the file is an image
         If objStream.Size > 0 Then
-            objStream.SaveToFile filePath, 2 ' Overwrite if the file exists
-            DownloadImage = True ' Success
+            objStream.SaveToFile filePath, 2 ' Overwrite if exists
+            DownloadImage = True
         Else
             WScript.Echo "❌ Image file is empty. Check authentication or URL."
         End If
@@ -64,29 +59,4 @@ Function DownloadImage(url, filePath, user, pass)
     End If
 
     Set objHTTP = Nothing
-End Function
-
-' =============================================================
-' Function: EncodeBase64
-' Purpose : Correctly encodes a string in Base64 for HTTP Basic Authentication.
-' =============================================================
-Function EncodeBase64(text)
-    Dim bytes, objXML, objNode
-    Set bytes = CreateObject("ADODB.Stream")
-    bytes.Type = 2 ' Text mode
-    bytes.Charset = "utf-8"
-    bytes.Open
-    bytes.WriteText text
-    bytes.Position = 0
-    bytes.Type = 1 ' Convert to binary
-
-    Set objXML = CreateObject("MSXML2.DOMDocument")
-    Set objNode = objXML.createElement("b64")
-    objNode.DataType = "bin.base64"
-    objNode.nodeTypedValue = bytes.Read
-    EncodeBase64 = Replace(objNode.Text, vbLf, "")
-
-    Set objNode = Nothing
-    Set objXML = Nothing
-    Set bytes = Nothing
 End Function
