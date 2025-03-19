@@ -1,6 +1,7 @@
 ' =============================================================
 ' Script Name  : grafana_to_ppt.vbs
-' Description  : Downloads a Grafana panel as an image with authentication and inserts it into a PowerPoint presentation.
+' Description  : Downloads a Grafana panel as an image with authentication 
+'               and inserts it into a PowerPoint presentation.
 ' =============================================================
 
 ' Define script path to store files in the same directory where the script runs
@@ -23,14 +24,10 @@ CreatePowerPoint imagePath, pptPath
 ' Purpose : Downloads an image from the specified URL with authentication.
 ' =============================================================
 Sub DownloadImage(url, filePath, user, pass)
-    Dim objHTTP, objStream, auth
-    Set objHTTP = CreateObject("MSXML2.XMLHTTP")
+    Dim objHTTP, objStream
+    Set objHTTP = CreateObject("MSXML2.XMLHTTP.6.0") ' Use latest MSXML version
 
-    ' Encode credentials for Basic Authentication
-    auth = "Basic " & Base64Encode(user & ":" & pass)
-
-    objHTTP.Open "GET", url, False
-    objHTTP.setRequestHeader "Authorization", auth
+    objHTTP.Open "GET", url, False, user, pass  ' Directly use Basic Authentication
     objHTTP.Send
 
     ' Check if the request was successful
@@ -51,39 +48,6 @@ Sub DownloadImage(url, filePath, user, pass)
 End Sub
 
 ' =============================================================
-' Function: Base64Encode
-' Purpose : Encodes a string into Base64 (needed for Basic Authentication)
-' =============================================================
-Function Base64Encode(str)
-    Dim objXML, objNode
-    Set objXML = CreateObject("MSXML2.DOMDocument")
-    Set objNode = objXML.createElement("Base64")
-    objNode.DataType = "bin.base64"
-    objNode.NodeTypedValue = Stream_StringToBinary(str)
-    Base64Encode = objNode.Text
-    Set objNode = Nothing
-    Set objXML = Nothing
-End Function
-
-' =============================================================
-' Function: Stream_StringToBinary
-' Purpose : Converts a string to binary for Base64 encoding
-' =============================================================
-Function Stream_StringToBinary(text)
-    Dim objStream
-    Set objStream = CreateObject("ADODB.Stream")
-    objStream.Type = 2 ' Text
-    objStream.Charset = "utf-8"
-    objStream.Open
-    objStream.WriteText text
-    objStream.Position = 0
-    objStream.Type = 1 ' Binary
-    Stream_StringToBinary = objStream.Read
-    objStream.Close
-    Set objStream = Nothing
-End Function
-
-' =============================================================
 ' Function: CreatePowerPoint
 ' Purpose : Creates a PowerPoint presentation and inserts the downloaded image.
 ' =============================================================
@@ -102,3 +66,4 @@ Sub CreatePowerPoint(imagePath, outputPath)
     pptPresentation.Close
     pptApp.Quit
 End Sub
+
