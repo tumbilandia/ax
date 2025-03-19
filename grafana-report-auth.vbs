@@ -1,16 +1,17 @@
 ' =============================================================
-' Script Name  : download_image.vbs
-' Description  : Downloads an image from Grafana using an API Key.
+' Script Name  : grafana_to_ppt.vbs
+' Description  : Downloads an image from Grafana using an API Key and inserts it into a PowerPoint slide.
 ' =============================================================
 
-' Set output file path
-Dim scriptPath, imagePath
+' Set output file paths
+Dim scriptPath, imagePath, pptPath
 scriptPath = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)
 imagePath = scriptPath & "\grafana_panel.png"
+pptPath = scriptPath & "\grafana_presentation.pptx"
 
 ' Grafana API Key (replace with your actual key)
 Dim apiKey
-apiKey = "eyJrIjoiABC123..."  ' ⚠️ Replace this with your API Key
+apiKey = "eyJrIjoiABC123..."  ' ⚠️ Replace this with your actual API Key
 
 ' Image URL
 Dim imageUrl
@@ -19,6 +20,12 @@ imageUrl = "http://localhost:3000/render/d/Kdh0OoSGz2/windows-exporter-dashboard
 ' Download the image
 If DownloadImage(imageUrl, imagePath, apiKey) Then
     WScript.Echo "✅ Image downloaded successfully: " & imagePath
+    ' Insert into PowerPoint
+    If InsertImageIntoPPT(imagePath, pptPath) Then
+        WScript.Echo "✅ PowerPoint created successfully: " & pptPath
+    Else
+        WScript.Echo "❌ Failed to create PowerPoint."
+    End If
 Else
     WScript.Echo "❌ Failed to download image."
 End If
@@ -59,4 +66,49 @@ Function DownloadImage(url, filePath, apiKey)
     End If
 
     Set objHTTP = Nothing
+End Function
+
+' =============================================================
+' Function: InsertImageIntoPPT
+' Purpose : Creates a PowerPoint file and inserts the downloaded image.
+' =============================================================
+Function InsertImageIntoPPT(imagePath, pptPath)
+    Dim pptApp, pptPres, pptSlide
+    InsertImageIntoPPT = False ' Default to failure
+
+    ' Create PowerPoint Application
+    On Error Resume Next
+    Set pptApp = CreateObject("PowerPoint.Application")
+    If Err.Number <> 0 Then
+        WScript.Echo "❌ PowerPoint is not installed."
+        Exit Function
+    End If
+    On Error GoTo 0
+
+    pptApp.Visible = True ' Show PowerPoint
+
+    ' Create a new presentation
+    Set pptPres = pptApp.Presentations.Add
+    Set pptSlide = pptPres.Slides.Add(1, 1) ' 1 = ppLayoutTitle
+
+    ' Insert image
+    On Error Resume Next
+    pptSlide.Shapes.AddPicture imagePath, False, True, 100, 100, 600, 400
+    If Err.Number <> 0 Then
+        WScript.Echo "❌ Failed to insert image into PowerPoint."
+        Exit Function
+    End If
+    On Error GoTo 0
+
+    ' Save and close
+    pptPres.SaveAs pptPath
+    pptPres.Close
+    pptApp.Quit
+
+    ' Cleanup
+    Set pptSlide = Nothing
+    Set pptPres = Nothing
+    Set pptApp = Nothing
+
+    InsertImageIntoPPT = True
 End Function
