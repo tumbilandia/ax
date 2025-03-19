@@ -1,7 +1,6 @@
 ' =============================================================
 ' Script Name  : grafana_to_ppt.vbs
-' Description  : Downloads a Grafana panel as an image with authentication 
-'               and inserts it into a PowerPoint presentation.
+' Description  : Downloads a Grafana panel image and inserts it into PowerPoint.
 ' =============================================================
 
 ' Define script path to store files in the same directory where the script runs
@@ -16,18 +15,27 @@ username = "admin"  ' Change this to your Grafana username
 password = "admin"  ' Change this to your Grafana password
 
 ' Call functions to download image and create PowerPoint
-DownloadImage "http://localhost:3000/render/d/Kdh0OoSGz2/windows-exporter-dashboard-2024-v2?orgId=1", imagePath, username, password
-CreatePowerPoint imagePath, pptPath
+If DownloadImage("http://localhost:3000/render/d/Kdh0OoSGz2/windows-exporter-dashboard-2024-v2?orgId=1", imagePath, username, password) Then
+    CreatePowerPoint imagePath, pptPath
+Else
+    WScript.Echo "❌ Failed to download image. Exiting..."
+End If
 
 ' =============================================================
 ' Function: DownloadImage
 ' Purpose : Downloads an image from the specified URL with authentication.
 ' =============================================================
-Sub DownloadImage(url, filePath, user, pass)
-    Dim objHTTP, objStream
-    Set objHTTP = CreateObject("MSXML2.XMLHTTP.6.0") ' Use latest MSXML version
+Function DownloadImage(url, filePath, user, pass)
+    Dim objHTTP, objStream, base64Auth
+    DownloadImage = False ' Default to failure
 
-    objHTTP.Open "GET", url, False, user, pass  ' Directly use Basic Authentication
+    Set objHTTP = CreateObject("MSXML2.XMLHTTP.6.0")
+
+    ' Encode credentials in Base64 (to fix authentication issues)
+    base64Auth = "Basic " & Base64Encode(user & ":" & pass)
+
+    objHTTP.Open "GET", url, False
+    objHTTP.setRequestHeader "Authorization", base64Auth
     objHTTP.Send
 
     ' Check if the request was successful
@@ -36,16 +44,38 @@ Sub DownloadImage(url, filePath, user, pass)
         objStream.Type = 1 ' Binary mode
         objStream.Open
         objStream.Write objHTTP.responseBody
-        objStream.SaveToFile filePath, 2 ' Overwrite if the file exists
+
+        ' Ensure the file is an image
+        If objStream.Size > 0 Then
+            objStream.SaveToFile filePath, 2 ' Overwrite if the file exists
+            DownloadImage = True ' Success
+        Else
+            WScript.Echo "❌ Image file is empty. Possible authentication or URL issue."
+        End If
+
         objStream.Close
         Set objStream = Nothing
     Else
-        WScript.Echo "❌ Failed to download image. HTTP Status: " & objHTTP.Status
-        WScript.Quit
+        WScript.Echo "❌ HTTP Error: " & objHTTP.Status & " - " & objHTTP.StatusText
     End If
 
     Set objHTTP = Nothing
-End Sub
+End Function
+
+' =============================================================
+' Function: Base64Encode
+' Purpose : Encodes a string in Base64 for HTTP Basic Authentication.
+' =============================================================
+Function Base64Encode(text)
+    Dim xml, node
+    Set xml = CreateObject("MSXML2.DOMDocument")
+    Set node = xml.createElement("b64")
+    node.DataType = "bin.base64"
+    node.Text = text
+    Base64Encode = node.Text
+    Set node = Nothing
+    Set xml = Nothing
+End Function
 
 ' =============================================================
 ' Function: CreatePowerPoint
@@ -53,6 +83,16 @@ End Sub
 ' =============================================================
 Sub CreatePowerPoint(imagePath, outputPath)
     Dim pptApp, pptPresentation, slide, image
+
+    ' Check if the file exists before inserting
+    Dim fso
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If Not fso.FileExists(imagePath) Then
+        WScript.Echo "❌ Image file not found: " & imagePath
+        Exit Sub
+    End If
+    Set fso = Nothing
+
     Set pptApp = CreateObject("PowerPoint.Application")
     pptApp.Visible = True
 
@@ -60,10 +100,15 @@ Sub CreatePowerPoint(imagePath, outputPath)
     Set slide = pptPresentation.Slides.Add(1, 1)
     slide.Shapes.Title.TextFrame.TextRange.Text = "Grafana Dashboard Panel"
 
+    ' Insert the image
     Set image = slide.Shapes.AddPicture(imagePath, False, True, 50, 100, 600, 400)
 
+    ' Save and close
     pptPresentation.SaveAs outputPath
     pptPresentation.Close
     pptApp.Quit
+
+    WScript.Echo "✅ PowerPoint created successfully: " & outputPath
 End Sub
+
 
