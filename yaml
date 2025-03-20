@@ -1,0 +1,74 @@
+To define a Persistent Volume (PV) and a Persistent Volume Claim (PVC) for 10Gi of block storage in OpenShift (or Kubernetes), you need to specify the correct storage class and volume mode.
+
+1. Persistent Volume (PV) Manifest
+This defines a static 10Gi volume of type block.
+
+yaml
+Copy
+Edit
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-block-10gi
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Block
+  accessModes:
+    - ReadWriteOnce  # Since block storage is often node-bound
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: block-storage  # Adjust this based on your storage class
+  csi:
+    driver: ocs-csi.ceph.com  # Example for Ceph RBD; adjust for your setup
+    volumeHandle: my-block-volume-id  # Unique volume ID in your storage backend
+    fsType: ""
+2. Persistent Volume Claim (PVC) Manifest
+This will request a 10Gi block storage volume.
+
+yaml
+Copy
+Edit
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-block-10gi
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Block
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: block-storage  # Ensure it matches the PV's storage class
+3. Explanation of Key Fields
+volumeMode: Block → Ensures raw block storage instead of a filesystem.
+accessModes:
+ReadWriteOnce (RWO) → Volume can be mounted only by a single node.
+storageClassName → Defines which storage class to use (must match the configured storage backend).
+persistentVolumeReclaimPolicy:
+Retain → The PV is not deleted when the PVC is deleted (can also be Delete or Recycle).
+csi section in PV → Needed if using a CSI-based storage provider (e.g., Ceph RBD, OpenShift Data Foundation).
+Next Steps
+Check Available Storage Classes:
+
+sh
+Copy
+Edit
+oc get storageclass
+If you have a CSI-backed storage class, use it in the storageClassName field.
+
+Apply the Manifests:
+
+sh
+Copy
+Edit
+oc apply -f pv.yaml
+oc apply -f pvc.yaml
+Verify the PVC Binding:
+
+sh
+Copy
+Edit
+oc get pvc pvc-block-10gi
+If bound, it should show a status of Bound.
+
